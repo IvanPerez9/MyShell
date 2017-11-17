@@ -1,0 +1,48 @@
+redirecciones a salida con "do" o "do2" >
+redirecciones de entrada con < , si es una secuencia se hace solo sobre el primero, y si es de salida solo sobre el ultimo 
+redirigir salida de errores, >&fichero 
+
+mandatos en segundo plano, poner al final el & lo hacia. Todos ellos se ejecuan en segundo plano si es una secuencia.
+
+Presentar el prompt : Ahorrarse lo del nombre de la maquina etc.. msh>_  siendo _ espacio en blanco 
+
+libreria parsse analiza 
+descripcion del error con errno y stderror 
+
+mandato interno los que son del propio bash como cd. Si es externo tiene un ejecutable por los archivos del sistema como ls 
+cd ir solo .
+incorporar a que linea me he movido con la ruta absoluta (variable de entorno) 
+pwd aparece el directorio en el que estamos.
+cd tiene que cambiar el directorio en el que estoy 
+solo mostrarlo cuando haces cd o pwd , no cambiar el prompt 
+
+Responder a las señales OJO
+
+2 consolas, una ejecutando nuesta shell y en otra TOP para ver lo ejecutable. (q para salir) htop 
+
+
+--------------- complicado gestion de procesos en background ----------
+
+con jobs y fg , son mandatos internos. Segundo plano con &
+jobs ver los mandatos en segundo plano. 
+esperar a ejecutar es usar un wait, sino mostrar automaticamente 
+Si el hijo termina antes que el padre, proceso zombi. De vez en cuando hacer un wait para esperar 
+wait es a proceso en general, waitpid para un proceso en concreto. Investigar waitpid con un tercer parametro. 
+
+Si los queremos pasar a primer plano, fg. Pasa una linea.
+El prompt desaparece hasta que se ejecute todo eso. 
+fg [argumento numero de la linea que queremos pasar a fg] , si no ponemos nada, pasa a primer plano la ultima linea de segundo plano .
+
+-------------------- APENDICE -------------------
+
+Comandos a probar WC , Sleep 
+
+------------------------------------ -> ------------------
+
+PUNERO -> ATRIBUTO === (*PUNTERO).ATRIBUTO 
+
+
+
+
+
+
