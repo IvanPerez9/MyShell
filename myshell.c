@@ -13,70 +13,121 @@
 
 // gcc -Wall -Wextra myshell.c libparsher_64.a -o myshell 
 
-int
+
 main(void) {
+
 	char buf[1024];
 	tline * line;
 	int i,j;
 
-	printf("msh> ");	
-	while (fgets(buf, 1024, stdin)) {
-	
-		// Acceso al atributo de un puntero de forma sencilla -> 
+	while(1){ // Bucle infinito que se repita 
 		
-		line = tokenize(buf);
-		if (line==NULL) {
-			continue;
-		}
-		
-		if (line->redirect_input != NULL) {
-			printf("redirección de entrada: %s\n", line->redirect_input);
-		}
-		if (line->redirect_output != NULL) {
-			printf("redirección de salida: %s\n", line->redirect_output);
-		}
-		if (line->redirect_error != NULL) {
-			printf("redirección de error: %s\n", line->redirect_error);
-		}
-		if (line->background) {
-			printf("comando a ejecutarse en background\n");
-		} 
-		for (i=0; i<line->ncommands; i++) {
-			printf("orden %d (%s):\n", i, line->commands[i].filename);
-			for (j=0; j<line->commands[i].argc; j++) {							// Recorre y dice cuales son los argumentos 
-				printf("  argumento %d: %s\n", j, line->commands[i].argv[j]);
-			}
-		}
-		
-		// int execvp (const char *file , char *const argv[]); 
-		// Código del ejecuta
-		
-		pid_t pid;
-		int status;
-
-		pid = fork();
-
-		if(pid<0){
-			fprintf(stderr , "Falla el fork %s\n", strerror(errno));
-			exit(1);
-		} else if (pid == 0) { 
-			execvp(line->commands[0].filename,line->commands[0].argv);				// El primero es el nombre del programa y luego coje a partir del segundo. Mover le puntero a la siguiente. Char ** es el argv +1 , tambien vale &argv[1] 
-			// Sino error
-			printf("Se ha producido un error\n");
-			exit(1);
-		} else {
-			// WIFEXITED(hijo) es 0 si el hijo ha terminado de manera anormal. Sino hace llamada a exit
-			// WEXITATUS(hijo) devuelve el valor de la salia exit 
-			wait(&status);
-			if(WIFEXITED (status) != 0)
-				if(WEXITSTATUS(status) != 0)
-					printf("El comando se ha ejecutado correctamente\n");
-			exit(0);		
-		}
 		printf("msh> ");	
+		while (fgets(buf, 1024, stdin)) {
+
+			// Acceso al atributo de un puntero de forma sencilla -> 
+
+			line = tokenize(buf);		
+			pid_t pid;
+			int status;
+
+			if (line==NULL) {
+				continue;
+			}
+
+			if (line->redirect_input != NULL) {
+				printf("redirección de entrada: %s\n", line->redirect_input);
+			}
+			if (line->redirect_output != NULL) {
+				printf("redirección de salida: %s\n", line->redirect_output);
+			}
+			if (line->redirect_error != NULL) {
+				printf("redirección de error: %s\n", line->redirect_error);
+			}
+			if (line->background) {
+				printf("comando a ejecutarse en background\n");
+			} 
+			for (i=0; i<line->ncommands; i++) {
+				printf("orden %d (%s):\n", i, line->commands[i].filename);
+				for (j=0; j<line->commands[i].argc; j++) {							// Recorre y dice cuales son los argumentos 
+					printf("  argumento %d: %s\n", j, line->commands[i].argv[j]);
+				}
+			}
+
+		// int execvp (const char *file , char *const argv[]); 
+
+		// Código para 1 comando
+
+		if(line->ncommands == 1){
+			pid = fork();
+
+			if(pid<0){
+				fprintf(stderr , "Falla el fork %s\n", strerror(errno));
+				exit(1);
+			} else if (pid == 0) { 
+				execvp(line->commands[0].filename,line->commands[0].argv);				// El primero es el nombre del programa y luego coje a partir del segundo. Mover le puntero a la siguiente. Char ** es el argv +1 , tambien vale &argv[1] 
+				// Sino error
+				printf("Se ha producido un error\n");
+				exit(1);
+			} else {
+				// WIFEXITED(hijo) es 0 si el hijo ha terminado de manera anormal. Sino hace llamada a exit
+				// WEXITATUS(hijo) devuelve el valor de la salia exit 
+				wait(&status);
+				if(WIFEXITED (status) != 0)
+					if(WEXITSTATUS(status) != 0)
+						printf("El comando se ha ejecutado correctamente\n");
+				exit(0);		
+			}
+
+		} else {  // Son 2 comandos. line ncommands == 2  
+
+			// Crear pipe para la comunicacion entre los comandos
+			int tuberia[2];
+			pid_t pid1,pid2; // Hijo 1 , hijo 2 
+
+			pipe(tuberia);
+
+			// Creo proceso hijo 1 
+			// El 0 es salida de pipe y el 1 es entrada a pipe
+
+			pid1 = fork ();
+			if(pid1<0){
+				fprintf(stderr, "falla el fork1 %s\n" , strerror(errno));
+				exit(1);
+			} else if (pid1 == 0) { // Ejemplo ls | sort . Hijo 1 
+				close(tuberia[0]);
+				dup2(tuberia[1] , 1);
+				// Entrada pipe y salida estandar 
+				execvp(line->commands[0].filename,line->commands[0].argv);
+				printf("Se ha producido un error\n");
+				exit(1);
+			} else { // Padre 
+				pid2=fork(); // Hijo 2 
+				if(pid2 ==0){
+					close(tuberia[1]);
+					dup2(tuberia[0] , 0);
+					execvp(line->commands[1].filename,line->commands[1].argv);
+				} else { // El padre
+					close(tuberia[0]); // Cerrar porque el padre no usa la tuberia 
+					close(tuberia[1]);
+
+					wait(&status);
+					// WIFEXITED(hijo) es 0 si el hijo ha terminado de manera anormal. Sino hace llamada a exit
+					// WEXITATUS(hijo) devuelve el valor de la salia exit
+					if(WIFEXITED (status) != 0){
+						if(WEXITSTATUS(status) != 0){
+							printf("El comando se ha ejecutado correctamente\n");
+						}
+					exit(0);
+					}
+				}
+			}
+			printf("msh> ");
+		}
 	}
-	return 0;
-}
+		return 0;
+	}
+}	
 
 /*  entrada estandra (stdin 0) 
 	salida estandar (stdout 1)
