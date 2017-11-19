@@ -49,11 +49,6 @@ main(void) {
 		}
 		
 		// int execvp (const char *file , char *const argv[]); 
-		
-		char *argumento = line->commands[0].argv[0]; // Valor 0 del argv de commands, de tcommands del parser.h
-		const char *fileName = line->commands[0].filename; 
-		char *comando[] = {argumento,(char *) 0};  // Necesario que el argumento sea puntero a array 
-		
 		// Código del ejecuta
 		
 		pid_t pid;
@@ -62,15 +57,21 @@ main(void) {
 		pid = fork();
 
 		if(pid<0){
-			fprintf(stderr , "Falla el fork\n");
-			return 1;
+			fprintf(stderr , "Falla el fork %s\n", strerror(errno));
+			exit(1);
 		} else if (pid == 0) { 
-			execvp(fileName,comando);				// El primero es el nombre del programa y luego coje a partir del segundo. Mover le puntero a la siguiente. Char ** es el argv +1 , tambien vale &argv[1] 
+			execvp(line->commands[0].filename,line->commands[0].argv);				// El primero es el nombre del programa y luego coje a partir del segundo. Mover le puntero a la siguiente. Char ** es el argv +1 , tambien vale &argv[1] 
+			// Sino error
 			printf("Se ha producido un error\n");
 			exit(1);
 		} else {
-			waitpid(pid,&status,0); // El 0 son opciones 
-			exit(0);
+			// WIFEXITED(hijo) es 0 si el hijo ha terminado de manera anormal. Sino hace llamada a exit
+			// WEXITATUS(hijo) devuelve el valor de la salia exit 
+			wait(&status);
+			if(WIFEXITED (status) != 0)
+				if(WEXITSTATUS(status) != 0)
+					printf("El comando se ha ejecutado correctamente\n");
+			exit(0);		
 		}
 		printf("msh> ");	
 	}
@@ -160,6 +161,8 @@ int mycd(int argc, char *argv[]){ // Mycd del tema 3 ejercicios
 
 	return 0;
 }
+
+
 
 
 
