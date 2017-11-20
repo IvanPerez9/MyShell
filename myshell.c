@@ -13,82 +13,114 @@
 
 // gcc -Wall -Wextra myshell.c libparsher_64.a -o myshell 
 
+int funcionRedireccion ( char * entrada , char * salida , char * error );
 
-main(void) {
+
+int main(void) {
 
 	char buf[1024];
 	tline * line;
 	int i,j;
+	printf("msh> ");
+	
+	while (fgets(buf, 1024, stdin)) {
 
-	while(1){ // Bucle infinito que se repita 
-		
-		printf("msh> ");	
-		while (fgets(buf, 1024, stdin)) {
+		// Acceso al atributo de un puntero de forma sencilla -> 
 
-			// Acceso al atributo de un puntero de forma sencilla -> 
+		line = tokenize(buf);		
+		pid_t pid;
+		int status;
 
-			line = tokenize(buf);		
-			pid_t pid;
-			int status;
+		if (line==NULL) {
+			continue;
+		}
 
-			if (line==NULL) {
-				continue;
+		if (line->redirect_input != NULL) {
+			//printf("redirección de entrada: %s\n", line->redirect_input);
+			//int funcionRedireccion ( line->redirect_input , NULL , NULL ); // ????????????????????????????????????????????????????
+		}
+		if (line->redirect_output != NULL) {
+			printf("redirección de salida: %s\n", line->redirect_output);
+		}
+		if (line->redirect_error != NULL) {
+			printf("redirección de error: %s\n", line->redirect_error);
+		}
+		if (line->background) {
+			printf("comando a ejecutarse en background\n");
+		} 
+		for (i=0; i<line->ncommands; i++) {
+			printf("orden %d (%s):\n", i, line->commands[i].filename);
+			for (j=0; j<line->commands[i].argc; j++) {							// Recorre y dice cuales son los argumentos 
+				printf("  argumento %d: %s\n", j, line->commands[i].argv[j]);
 			}
-
-			if (line->redirect_input != NULL) {
-				printf("redirección de entrada: %s\n", line->redirect_input);
-			}
-			if (line->redirect_output != NULL) {
-				printf("redirección de salida: %s\n", line->redirect_output);
-			}
-			if (line->redirect_error != NULL) {
-				printf("redirección de error: %s\n", line->redirect_error);
-			}
-			if (line->background) {
-				printf("comando a ejecutarse en background\n");
-			} 
-			for (i=0; i<line->ncommands; i++) {
-				printf("orden %d (%s):\n", i, line->commands[i].filename);
-				for (j=0; j<line->commands[i].argc; j++) {							// Recorre y dice cuales son los argumentos 
-					printf("  argumento %d: %s\n", j, line->commands[i].argv[j]);
-				}
-			}
+		}
 
 		// int execvp (const char *file , char *const argv[]); 
 
-		// Código para 1 comando
+		// Código para 1 comando. Primero comprobar si es CD luego solo 1 comando cualquiera
 
 		if(line->ncommands == 1){
-			pid = fork();
+			
+			if (strcmp(line->commands[0].argv[0], "cd") == 0) { // Si es cd. Ejerccio del tema 3
+				
+				char *dir; // Variable de directorios 
+				char buffer[512];
 
-			if(pid<0){
-				fprintf(stderr , "Falla el fork %s\n", strerror(errno));
-				exit(1);
-			} else if (pid == 0) { 
-				execvp(line->commands[0].filename,line->commands[0].argv);				// El primero es el nombre del programa y luego coje a partir del segundo. Mover le puntero a la siguiente. Char ** es el argv +1 , tambien vale &argv[1] 
-				// Sino error
-				printf("Se ha producido un error\n");
-				exit(1);
-			} else {
-				// WIFEXITED(hijo) es 0 si el hijo ha terminado de manera anormal. Sino hace llamada a exit
-				// WEXITATUS(hijo) devuelve el valor de la salia exit 
-				wait(&status);
-				if(WIFEXITED (status) != 0)
-					if(WEXITSTATUS(status) != 0)
-						printf("El comando se ha ejecutado correctamente\n");
-				exit(0);		
+				if(line->commands[0].argc > 2) // No puedo hacer un cd a 2 directorios 
+				{
+				  fprintf(stderr,"Uso: %s directorio\n", line->commands[0].argv[0]);
+				}
+				if (line->commands[0].argc == 1) // Si vale 1 , no me pasan nada, osea nombre del programa.
+				{
+					dir = getenv("HOME");
+					if(dir == NULL)
+					{
+					  fprintf(stderr,"No existe la variable $HOME\n");	
+					}
+				}else {
+					dir = line->commands[0].argv[1];
+				}
+				// Comprobar si es un directorio.
+				if (chdir(dir) != 0) { // Sino es distinto de 0 lo hace normal el chdir 
+						fprintf(stderr,"Error al cambiar de directorio: %s\n", strerror(errno)); // Los errores a llamada al sistema siempre se guardan en errno, y strerror explica el porque de errno.
+				}
+				printf( "El directorio actual es: %s\n", getcwd(buffer,-1));
+				
+			} else { 	// Si es solo 1 comando pero NO es CD . Codigo Ejecuta tema 4 
+			
+				pid = fork();
+
+				if(pid<0){
+					fprintf(stderr , "Falla el fork %s\n", strerror(errno));
+					exit(1);
+				} else if (pid == 0) {  // Hijo 
+					execvp(line->commands[0].filename,line->commands[0].argv);// El primero es el nombre del programa y luego coje a partir del segundo. Mover le puntero a la siguiente. Char ** es el argv +1 , tambien vale &argv[1] 
+					// Sino error
+					printf("Se ha producido un error\n");
+					exit(1);
+				} else { // Padre
+					// WIFEXITED(hijo) es 0 si el hijo ha terminado de manera anormal. Sino hace llamada a exit
+					// WEXITATUS(hijo) devuelve el valor de la salia exit 
+					wait(&status);
+					if(WIFEXITED (status) != 0)
+						if(WEXITSTATUS(status) != 0)
+							printf("El comando se ha ejecutado correctamente\n");
+					exit(0);		
+				}
 			}
 
 		} else {  // Son 2 comandos. line ncommands == 2  
 
 			// Crear pipe para la comunicacion entre los comandos
+			
 			int tuberia[2];
 			pid_t pid1,pid2; // Hijo 1 , hijo 2 
 
-			pipe(tuberia);
+			pipe(tuberia); // Inicializo 
 
 			// Creo proceso hijo 1 
 			// El 0 es salida de pipe y el 1 es entrada a pipe
+			// Mirar dibujo pipe para entenderlo mejor 
 
 			pid1 = fork ();
 			if(pid1<0){
@@ -115,18 +147,16 @@ main(void) {
 					// WIFEXITED(hijo) es 0 si el hijo ha terminado de manera anormal. Sino hace llamada a exit
 					// WEXITATUS(hijo) devuelve el valor de la salia exit
 					if(WIFEXITED (status) != 0){
-						if(WEXITSTATUS(status) != 0){
+						if(WEXITSTATUS(status) != 0)
 							printf("El comando se ha ejecutado correctamente\n");
-						}
-					exit(0);
 					}
 				}
 			}
-			printf("msh> ");
 		}
+		printf("msh> ");
 	}
-		return 0;
-	}
+	return 0;
+	
 }	
 
 /*  entrada estandra (stdin 0) 
@@ -183,35 +213,6 @@ int funcionRedireccion ( char * entrada , char * salida , char * error ){
 	return 0;
 }
 
-int mycd(int argc, char *argv[]){ // Mycd del tema 3 ejercicios 
-	char *dir;
-	char buffer[512];
-	
-	if(argc > 2) // No puedo hacer un cd a 2 directorios 
-	{
-	  fprintf(stderr,"Uso: %s directorio\n", argv[0]);
-	  return 1;
-	}
-	if (argc == 1) // Si vale 1 , no me pasan nada, osea nombre del programa. Por eso cd sin nada.
-	{
-		dir = getenv("HOME"); // Inicio en Home . Es como en shell $Home
-		if(dir == NULL)
-		{
-		  fprintf(stderr,"No existe la variable $HOME\n");	
-		}
-	}
-	else 
-	{
-		dir = argv[1];
-	}
-	// Comprobar si es un directorio
-	if (chdir(dir) != 0) {
-			fprintf(stderr,"Error al cambiar de directorio: %s\n", strerror(errno)); // Los errores a llamada al sistema siempre se guardan en errno, y strerror explica el porque de errno.
-	}
-	printf( "El directorio actual es: %s\n", getcwd(buffer,-1)); // comprobar si he cambiado de directorio. getcwd es como un pwd en shell 
-
-	return 0;
-}
 
 
 
