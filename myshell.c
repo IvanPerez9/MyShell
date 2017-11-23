@@ -14,12 +14,14 @@
 // gcc -Wall -Wextra myshell.c libparsher_64.a -o myshell 
 
 int funcionRedireccion ( char * entrada , char * salida , char * error );
+void mycd ();
+
+tline * line;
 
 
 int main(void) {
 
 	char buf[1024];
-	tline * line;
 	int i,j;
 	printf("msh> ");
 	
@@ -37,7 +39,7 @@ int main(void) {
 
 		if (line->redirect_input != NULL) {
 			//printf("redirección de entrada: %s\n", line->redirect_input);
-			//int funcionRedireccion ( line->redirect_input , NULL , NULL ); // ????????????????????????????????????????????????????
+			funcionRedireccion ( line->redirect_input , NULL , NULL ); // ????????????????????????????????????????????????????
 		}
 		if (line->redirect_output != NULL) {
 			printf("redirección de salida: %s\n", line->redirect_output);
@@ -63,28 +65,7 @@ int main(void) {
 			
 			if (strcmp(line->commands[0].argv[0], "cd") == 0) { // Si es cd. Ejerccio del tema 3
 				
-				char *dir; // Variable de directorios 
-				char buffer[512];
-
-				if(line->commands[0].argc > 2) // No puedo hacer un cd a 2 directorios 
-				{
-				  fprintf(stderr,"Uso: %s directorio\n", line->commands[0].argv[0]);
-				}
-				if (line->commands[0].argc == 1) // Si vale 1 , no me pasan nada, osea nombre del programa.
-				{
-					dir = getenv("HOME");
-					if(dir == NULL)
-					{
-					  fprintf(stderr,"No existe la variable $HOME\n");	
-					}
-				}else {
-					dir = line->commands[0].argv[1];
-				}
-				// Comprobar si es un directorio.
-				if (chdir(dir) != 0) { // Sino es distinto de 0 lo hace normal el chdir 
-						fprintf(stderr,"Error al cambiar de directorio: %s\n", strerror(errno)); // Los errores a llamada al sistema siempre se guardan en errno, y strerror explica el porque de errno.
-				}
-				printf( "El directorio actual es: %s\n", getcwd(buffer,-1));
+				mycd(); // Subprograma de CD 
 				
 			} else { 	// Si es solo 1 comando pero NO es CD . Codigo Ejecuta tema 4 
 			
@@ -104,8 +85,7 @@ int main(void) {
 					wait(&status);
 					if(WIFEXITED (status) != 0)
 						if(WEXITSTATUS(status) != 0)
-							printf("El comando se ha ejecutado correctamente\n");
-					exit(0);		
+							printf("El comando se ha ejecutado correctamente\n");		
 				}
 			}
 
@@ -211,6 +191,33 @@ int funcionRedireccion ( char * entrada , char * salida , char * error ){
 	}
 	
 	return 0;
+}
+
+void mycd (){
+	
+	char *dir; // Variable de directorios 
+	char buffer[512];
+	
+	if(line->commands[0].argc > 2) // No puedo hacer un cd a 2 directorios 
+		{
+		  fprintf(stderr,"Uso: %s directorio\n", line->commands[0].argv[0]);
+		}
+	if (line->commands[0].argc == 1) // Si vale 1 , no me pasan nada, osea nombre del programa.
+	{
+		dir = getenv("HOME");
+		if(dir == NULL)
+		{
+			fprintf(stderr,"No existe la variable $HOME\n");	
+		}
+	}else {
+		dir = line->commands[0].argv[1];
+	}
+	
+	// Comprobar si es un directorio.
+	if (chdir(dir) != 0) { // Sino es distinto de 0 lo hace normal el chdir 
+		fprintf(stderr,"Error al cambiar de directorio: %s\n", strerror(errno)); // Los errores a llamada al sistema siempre se guardan en errno, y strerror explica el porque de errno.
+	}
+	printf( "El directorio actual es: %s\n", getcwd(buffer,-1));
 }
 
 
