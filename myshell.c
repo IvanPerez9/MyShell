@@ -78,7 +78,6 @@ int main(void) {
 					execvp(line->commands[0].filename,line->commands[0].argv);// El primero es el nombre del programa y luego coje a partir del segundo. Mover le puntero a la siguiente. Char ** es el argv +1 , tambien vale &argv[1] 
 					// Sino error
 					printf("Se ha producido un error\n");
-					exit(1);
 				} else { // Padre
 					// WIFEXITED(hijo) es 0 si el hijo ha terminado de manera anormal. Sino hace llamada a exit
 					// WEXITATUS(hijo) devuelve el valor de la salia exit 
@@ -90,48 +89,100 @@ int main(void) {
 			}
 
 		} else {  // Son 2 comandos. line ncommands == 2  
-
-			// Crear pipe para la comunicacion entre los comandos
 			
-			int tuberia[2];
-			pid_t pid1,pid2; // Hijo 1 , hijo 2 
+			// Variable tuberia de memoria dinamica para los N comandos que haya
+			// Variable pid para los descriptores de fichero, irá cambiando con los forks 
+			// Contador para los bucles
 
-			pipe(tuberia); // Inicializo 
+			int ** tuberia = ( int ** ) malloc ((line->ncommands-1) * sizeof(int *));
+			int * pid = (int *) malloc ((line-> ncommands-1) * sizeof (int));
+			int i; 
+			
+			printf ("Hola\n");
+			
+			// Iniciar cada tuberia. Luego hacer free a cada una y la global . Inicializo los pipes (tuberia)
+			
+			for (i =0 ; i<line->ncommands-1 ; i++){
+				tuberia [i] = malloc (2 * sizeof(int));	// 0 y 1 
+				pipe(tuberia[i]);
+				printf("Tuberia ini %d\n" , i);
+			}
+			
+			// Bucle de busqueda hasta ncommands - 1
+			// 1 entrada a tuberia, 0 salida de tuberia
+			// 0 entrada estandar, 1 salida estandar 
+			// dup2 redirije de old a new file ( descriptor de fichero ) 
+			
+			for(i=0; i< line->ncommands-1 ; i++){
+				
+				pid[i]	= fork ();
+				
+				printf ("Hola fork\n");
+				
+				if(pid[i] < 0){
+					printf("El fork ha fallado");
+					return 1;
+				}else if(pid[i] == 0){
+					
+					printf("Hola bucle\n");
+					
+					if(i==0){	// Si es el primer hijo. Primer comando.
+						printf("Hola bucle 0\n");
+						close(tuberia[i][0]);
+						dup2(tuberia[i][1] , 1);
+						execvp(line->commands[i].filename,line->commands[i].argv);
 
-			// Creo proceso hijo 1 
-			// El 0 es salida de pipe y el 1 es entrada a pipe
-			// Mirar dibujo pipe para entenderlo mejor 
+						printf ("Hola primer hijo\n");
 
-			pid1 = fork ();
-			if(pid1<0){
-				fprintf(stderr, "falla el fork1 %s\n" , strerror(errno));
-				exit(1);
-			} else if (pid1 == 0) { // Ejemplo ls | sort . Hijo 1 
-				close(tuberia[0]);
-				dup2(tuberia[1] , 1);
-				// Entrada pipe y salida estandar 
-				execvp(line->commands[0].filename,line->commands[0].argv);
-				printf("Se ha producido un error\n");
-				exit(1);
-			} else { // Padre 
-				pid2=fork(); // Hijo 2 
-				if(pid2 ==0){
-					close(tuberia[1]);
-					dup2(tuberia[0] , 0);
-					execvp(line->commands[1].filename,line->commands[1].argv);
-				} else { // El padre
-					close(tuberia[0]); // Cerrar porque el padre no usa la tuberia 
-					close(tuberia[1]);
+					} else if (i == line->ncommands -1 ){ // Es el último comando
+						
+						close(tuberia[i][1]);
+						dup2(tuberia[i][0] , 0);
+						execvp(line->commands[i].filename,line->commands[i].argv);
 
-					wait(&status);
-					// WIFEXITED(hijo) es 0 si el hijo ha terminado de manera anormal. Sino hace llamada a exit
-					// WEXITATUS(hijo) devuelve el valor de la salia exit
-					if(WIFEXITED (status) != 0){
-						if(WEXITSTATUS(status) != 0)
-							printf("El comando se ha ejecutado correctamente\n");
+						printf ("Hola ultimo hijo\n");
+
+					} else {							// El resto, comandos intermedios.
+						
+						close(tuberia[i][0]);
+						close(tuberia[i-1][1]);
+						dup2(tuberia[i][1] , 1);
+						dup2(tuberia[i-1][0] , 0);
+						execvp(line->commands[i].filename,line->commands[i].argv);
+
+						printf ("Hola otros hijos\n");
+
 					}
+
+					execvp(line->commands[i].filename,line->commands[i].argv);// El primero es el nombre del programa y luego coje a partir del segundo. Mover le puntero a la siguiente. Char ** es el argv +1 , tambien vale &argv[1] 
+					// Sino error
+					printf("Se ha producido un error\n");
+					exit(1);
+			
 				}
 			}
+			// Esperar a que termine todo
+			for(i=0 ; i<line->ncommands; i++){
+				// WIFEXITED(hijo) es 0 si el hijo ha terminado de manera anormal. Sino hace llamada a exit
+				// WEXITATUS(hijo) devuelve el valor de la salia exit 
+				wait(&status);
+				if(WIFEXITED (status) != 0)
+					if(WEXITSTATUS(status) != 0)
+						printf("El comando se ha ejecutado correctamente\n");
+			}
+			
+			// Cerrar los pipes 
+			for(i=0 ; i<line->ncommands ; i++){
+				close (tuberia[i][0]);
+				close (tuberia[i][1]);
+			}
+			
+			// Liberar memoria 
+			for(i=0; i<line->ncommands; i++){
+				free(tuberia[i]);	
+			}
+			free(tuberia);
+			
 		}
 		printf("msh> ");
 	}
