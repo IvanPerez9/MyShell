@@ -11,6 +11,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+/*
+* Autores: Iván Pérez Huete - Carlos Olmo Sahuquillo
+*
+* 11/25/17
+*/
+
 // gcc -Wall -Wextra myshell.c libparsher_64.a -o myshell 
 
 int funcionRedireccion ( char * entrada , char * salida , char * error );
