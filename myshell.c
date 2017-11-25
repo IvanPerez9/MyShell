@@ -42,9 +42,9 @@ int main(void) {
 		int pid[line->ncommands];			// No puedo hacerlo dinamico, necesito un int no un * int 		
 		// Iniciar cada tuberia. Luego hacer free a cada una y la global . Inicializo los pipes (tuberia)		
 		for (i =0 ; i<line->ncommands; i++){
-			tuberia [i] = malloc (2 * sizeof(int));	// 0 y 1 
+			tuberia [i] = (int *) malloc (2 * sizeof(int));	// 0 y 1  ojo aqui el casteo. 
 			pipe(tuberia[i]);
-			printf("Tuberia ini %d\n" , i);
+			printf("Tuberia ini %d\n" , i); // duda porque 3 tuberia ????????????????????????????????
 		}
 
 		if (line==NULL) {
@@ -78,29 +78,30 @@ int main(void) {
 			if(pid[i]<0){
 				fprintf(stderr , "Falla el fork %s\n", strerror(errno));
 				exit(1);
-			} else if (pid[i] == 0) {  // Hijo 1 o único hijo (?) . Comprende CD 
+			} else if (pid[i] == 0) { //El fork no falla , habrá hijos 
 				if(i==0){
-					if(line->ncommands > 1){       // Si hay más de 1 inicializa pipe y cierra E/S
-							
-						close(tuberia[i][0]);
-						dup2(tuberia[i][1] , 1);
-						
-					} 
 					if((line->ncommands == 1) &&  (strcmp(line->commands[0].argv[0], "cd") == 0)){ // Subprograma de CD 
 						
 						mycd();
 						
-					} else {
+					} 
+					if(line->ncommands == 1) { // ejecuta si es solo 1 y no es CD 
 						
 						execvp(line->commands[i].filename,line->commands[i].argv);	
 						fprintf(stderr,"Error al ejecutar comando: %s\n", strerror(errno));
 						exit(1);
 						
 					}
-				}else if (i == line->ncommands -1 ){ // Es el último comando AQUI
+					if(line->ncommands > 1){       // Si hay más de 1 inicializa pipe y cierra E/S
+							
+						close(tuberia[i][0]);
+						dup2(tuberia[i][1] , 1);
+						
+					} 
+				}else if (i == line->ncommands -1 ){ // Es el último comando AQUI cambio -1 
 
-					close(tuberia[i][1]);
-					dup2(tuberia[i][0] , 0);
+					close(tuberia[i-1][1]);
+					dup2(tuberia[i-1][0] , 0);
 					execvp(line->commands[i].filename,line->commands[i].argv);
 
 					fprintf(stderr,"Error al ejecutar comando: %s\n", strerror(errno));
@@ -124,7 +125,7 @@ int main(void) {
 		}
 		
 		// Esperar a que termine todo
-		for(i=0 ; i<line->ncommands ; i++){
+		for(i=0 ; i<line->ncommands; i++){
 			// WIFEXITED(hijo) es 0 si el hijo ha terminado de manera anormal. Sino hace llamada a exit
 			// WEXITATUS(hijo) devuelve el valor de la salia exit 
 			wait(&status);
@@ -134,7 +135,7 @@ int main(void) {
 		}
 			
 		//Cerrar los pipes 
-		for(i=0 ; i<line->ncommands ; i++){
+		for(i=0 ; i<line->ncommands; i++){
 			close (tuberia[i][0]);
 			close (tuberia[i][1]);
 		}
