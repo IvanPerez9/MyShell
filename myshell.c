@@ -45,7 +45,7 @@ int main(void) {
 		// Contador para los bucles
 
 		int ** tuberia = ( int ** ) malloc ((line->ncommands) * sizeof(int *));
-		int pid[line->ncommands];			// No puedo hacerlo dinamico, necesito un int no un * int 		
+		int pid	;			 		
 		// Iniciar cada tuberia. Luego hacer free a cada una y la global . Inicializo los pipes (tuberia)		
 		for (i =0 ; i<line->ncommands; i++){
 			tuberia [i] = (int *) malloc (2 * sizeof(int));	// 0 y 1  ojo aqui el casteo. 
@@ -80,30 +80,29 @@ int main(void) {
 		// int execvp (const char *file , char *const argv[]); 
 
 		for(i=0 ; i<line->ncommands; i++){ // recorrer los ncomandos 
-			pid[i] = fork();
-			if(pid[i]<0){
+			pid = fork();
+			if(pid<0){
 				fprintf(stderr , "Falla el fork %s\n", strerror(errno));
 				exit(1);
-			} else if (pid[i] == 0) { //El fork no falla , habrá hijos 
+			} else if (pid == 0) { //El fork no falla , habrá hijos 
 				if(i==0){
 					if((line->ncommands == 1) &&  (strcmp(line->commands[0].argv[0], "cd") == 0)){ // Subprograma de CD 
 						
 						mycd();
 						
 					} 
-					if(line->ncommands == 1) { // ejecuta si es solo 1 y no es CD 
-						
-						execvp(line->commands[i].filename,line->commands[i].argv);	
-						fprintf(stderr,"Error al ejecutar comando: %s\n", strerror(errno));
-						exit(1);
-						
-					}
 					if(line->ncommands > 1){       // Si hay más de 1 inicializa pipe y cierra E/S
 							
 						close(tuberia[i][0]);
 						dup2(tuberia[i][1] , 1);
 						
 					} 
+					 // ejecuta si es solo 1 y no es CD 
+						
+						execvp(line->commands[i].filename,line->commands[i].argv);	
+						fprintf(stderr,"Error al ejecutar comando: %s\n", strerror(errno));
+						exit(1);
+			
 				}else if (i == line->ncommands -1 ){ // Es el último comando AQUI cambio -1 
 
 					close(tuberia[i-1][1]);
@@ -239,7 +238,6 @@ void mycd (){
 	}
 	printf( "El directorio actual es: %s\n", getcwd(buffer,-1));
 }
-
 
 
 
