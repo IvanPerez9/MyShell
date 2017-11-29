@@ -6,7 +6,6 @@
 #include <errno.h>
 #include <wait.h> 
 #include <string.h> 
-
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -22,13 +21,17 @@
 int funcionRedireccion ( char * entrada , char * salida , char * error );
 void mycd ();
 
+#define CDCONTS "cd" // Constante para hacer cd 
+
 tline * line;
 
 
 int main(void) {
 
 	char buf[1024];
-	int i,j;
+	int i;
+	pid_t pid;
+	int ** tuberias;
 	
 	
 	printf("msh> ");
@@ -39,19 +42,7 @@ int main(void) {
 
 		line = tokenize(buf);		
 		int status;
-		
-		// Variable tuberia de memoria dinamica para los N comandos que haya
-		// Variable pid para los descriptores de fichero, irá cambiando con los forks 
-		// Contador para los bucles
 
-		int ** tuberia = ( int ** ) malloc ((line->ncommands) * sizeof(int *));
-		int pid	;			 		
-		// Iniciar cada tuberia. Luego hacer free a cada una y la global . Inicializo los pipes (tuberia)		
-		for (i =0 ; i<line->ncommands; i++){
-			tuberia [i] = (int *) malloc (2 * sizeof(int));	// 0 y 1  ojo aqui el casteo. 
-			pipe(tuberia[i]);
-			printf("Tuberia ini %d\n" , i); // duda porque 3 tuberia ????????????????????????????????
-		}
 
 		if (line==NULL) {
 			continue;
@@ -59,104 +50,117 @@ int main(void) {
 
 		if (line->redirect_input != NULL) {
 			//printf("redirección de entrada: %s\n", line->redirect_input);
-			funcionRedireccion ( line->redirect_input , NULL , NULL ); // ????????????????????????????????????????????????????
+			//funcionRedireccion ( line->redirect_input , NULL , NULL ); 
+			//freopen(line->redirect_input , "r" , stdin );
+			return(1);
 		}
 		if (line->redirect_output != NULL) {
-			printf("redirección de salida: %s\n", line->redirect_output);
+			//printf("redirección de salida: %s\n", line->redirect_output);
+			freopen(line->redirect_output , "w" , stdout );
+			return(1);
 		}
 		if (line->redirect_error != NULL) {
-			printf("redirección de error: %s\n", line->redirect_error);
+			//printf("redirección de error: %s\n", line->redirect_error);
+			freopen(line->redirect_error , "w" , stderr );
+			return(1);
 		}
 		if (line->background) {
 			printf("comando a ejecutarse en background\n");
+			return(1);
 		} 
-		for (i=0; i<line->ncommands; i++) {
-			printf("orden %d (%s):\n", i, line->commands[i].filename);
-			for (j=0; j<line->commands[i].argc; j++) {							// Recorre y dice cuales son los argumentos 
-				printf("  argumento %d: %s\n", j, line->commands[i].argv[j]);
-			}
-		}
 
 		// int execvp (const char *file , char *const argv[]); 
 
-		for(i=0 ; i<line->ncommands; i++){ // recorrer los ncomandos 
-			pid = fork();
-			if(pid<0){
-				fprintf(stderr , "Falla el fork %s\n", strerror(errno));
-				exit(1);
-			} else if (pid == 0) { //El fork no falla , habrá hijos 
-				if(i==0){
-					if((line->ncommands == 1) &&  (strcmp(line->commands[0].argv[0], "cd") == 0)){ // Subprograma de CD 
-						
-						mycd();
-						
-					} 
-					if(line->ncommands > 1){       // Si hay más de 1 inicializa pipe y cierra E/S
-							
-						close(tuberia[i][0]);
-						dup2(tuberia[i][1] , 1);
-						
-					} 
-					 // ejecuta si es solo 1 y no es CD 
-						
-						execvp(line->commands[i].filename,line->commands[i].argv);	
-						fprintf(stderr,"Error al ejecutar comando: %s\n", strerror(errno));
-						exit(1);
-			
-				}else if (i == line->ncommands -1 ){ // Es el último comando AQUI cambio -1 
-
-					close(tuberia[i-1][1]);
-					dup2(tuberia[i-1][0] , 0);
-					execvp(line->commands[i].filename,line->commands[i].argv);
-
-					fprintf(stderr,"Error al ejecutar comando: %s\n", strerror(errno));
-					exit(1);
-
-				} else {							// El resto, comandos intermedios.
-					
-					close(tuberia[i][0]);
-					close(tuberia[i-1][1]);
-					dup2(tuberia[i][1] , 1);
-					dup2(tuberia[i-1][0] , 0);
-					execvp(line->commands[i].filename,line->commands[i].argv);
-
-					fprintf(stderr,"Error al ejecutar comando: %s\n", strerror(errno));
+		// Para 1 solo comando, contampla CD 
+		if(line->ncommands==1){
+			// Comprueba si es cd
+			if (strcmp(line->commands[0].argv[0], CDCONTS) == 0){// Comprueba si es el mandato es cd, llama a subprograma
+				mycd();
+			}else{ // Ejecuta el comando, como ejercicio de ejecuta 
+				pid = fork();
+				if (pid < 0) {  // Error fork
+					fprintf(stderr, "Falló el fork().\n%s\n", strerror(errno));
 					exit(1);
 				}
+				else if (pid == 0) { // Hace hijo 				
+					execvp(line->commands[0].filename, line->commands[0].argv ); // Si pasa del exec , es que hay error
+					fprintf(stderr, "Error al ejecutar el comando: %s\n", strerror(errno));
+					exit(1);
+				}else{ 	
+					wait (&status);
+					if (WIFEXITED(status) != 0)
+						if (WEXITSTATUS(status) != 0)
+							printf("El comando no se ejecutó correctamente\n");
+				}
+			}
+		}else {// Para n Comandos
 				
-			}else {
-					close(tuberia[i][1]);
-			}	
+			// Variable tuberia de memoria dinamica para los N-1 comandos que haya ( una tuberia cada 2 comandos )
+			// Variable pid para los descriptores de fichero, irá cambiando con los forks 
+				
+			tuberias=(int**) malloc ((line->ncommands-1)*sizeof(int*));
+			for(i=0;i<line->ncommands-1;i++){
+				tuberias[i]=(int*)malloc(2*sizeof(int));
+				pipe(tuberias[i]);
+				printf("Tuberia ini %d\n" , i);
+			}
+			int pids;
+			for(i=0;i<line->ncommands;i++){
+				// Hace un fork() para cada hijo. El numero va cambiando con los forks
+				pids=fork();				
+				if(pids<0){ //error
+					fprintf(stderr, "Falló el fork().\n%s\n", strerror(errno));
+					exit(1);
+				} else if (pids==0){ // Sino error hace hijos
+					if(i==0){ //Primer hjijo
+						close(tuberias[i][0]);
+						dup2(tuberias[i][1],1);
+						execvp(line->commands[i].filename, line->commands[i].argv );
+
+						printf("Error al ejecutar el comando: %s\n", strerror(errno));
+						exit(1);
+					}else if(i==(line->ncommands-1)){// Utimo hijo
+						close(tuberias[i-1][1]);
+						dup2(tuberias[i-1][0],0);
+						execvp(line->commands[i].argv[0], line->commands[i].argv);
+						
+						printf("Error al ejecutar el comando: %s\n", strerror(errno));
+						exit(1);
+					}else{	// Resto de hijos			
+						close(tuberias[i][0]);	
+						close(tuberias[i-1][1]);	
+						dup2(tuberias[i-1][0],0);	
+						dup2(tuberias[i][1],1);
+
+						execvp(line->commands[i].argv[0], line->commands[i].argv);	
+
+						printf("Error al ejecutar el comando: %s\n", strerror(errno));
+						exit(1);
+					}
+				
+				}else{	//Padre
+					if(!(i==(line->ncommands-1))){ // Por esto la violacion del core
+						close(tuberias[i][1]);
+					}
+				}
+			}
+			for(i=0;i<line->ncommands;i++){	
+				waitpid(pids,&status,0);
+				//fprintf(stderr,"waits: %s\n", strerror(errno));
+			}
+			//Liberamos la memoria reservada antes
+			for(i=0;i<line->ncommands-1;i++){
+				free(tuberias[i]);
+			}
+			free(tuberias);
 		}
-		
-		// Esperar a que termine todo
-		for(i=0 ; i<line->ncommands; i++){
-			// WIFEXITED(hijo) es 0 si el hijo ha terminado de manera anormal. Sino hace llamada a exit
-			// WEXITATUS(hijo) devuelve el valor de la salia exit 
-			wait(&status);
-			if(WIFEXITED (status) != 0)
-				if(WEXITSTATUS(status) != 0)
-					printf("El comando se ha ejecutado correctamente\n");
-		}
-			
-		//Cerrar los pipes 
-		for(i=0 ; i<line->ncommands; i++){
-			close (tuberia[i][0]);
-			close (tuberia[i][1]);
-		}
-		
-			
-		// Liberar memoria 
-		for(i=0; i<line->ncommands; i++){
-			free(tuberia[i]);	
-		}
-		free(tuberia);
-			
+
 		printf("msh> ");
 	}
 	return 0;
 	
-}		
+}
+
 
 /*  entrada estandra (stdin 0) 
 	salida estandar (stdout 1)
@@ -177,8 +181,8 @@ int funcionRedireccion ( char * entrada , char * salida , char * error ){
 			fprintf( stderr , "%s : Error. %s\n" , entrada , strerror(errno)); // Mostrar error 
 			return 1;
 		} else {
-			ficheroEntrada = fileno(fichero); // puntero del stream a descriptor de fichero . Para pasar a int 
-			dup2(ficheroEntrada,0); // Redirreccion a 0, Entrada estandar 
+			ficheroEntrada = fileno(fichero); // puntero del stream a descriptor de fichero . 
+			dup2(ficheroEntrada,fileno(stdin)); // Redirreccion a 0, Entrada estandar 
 			fclose(fichero);
 		}	
 	}
@@ -191,8 +195,8 @@ int funcionRedireccion ( char * entrada , char * salida , char * error ){
 			return 1;
 		} else {
 			ficheroSalida = fileno(fichero);
-			dup2(ficheroSalida,1); // Redirreccion a 1, ESalida estandar 
-			fclose(fichero);
+			dup2(ficheroSalida,fileno(stdout)); // Redirreccion a 1, Salida estandar . Fileno para descriptor de fichero
+			fclose(fichero);					// dup 2 solo usa int 
 		}
 	}
 	
@@ -204,7 +208,7 @@ int funcionRedireccion ( char * entrada , char * salida , char * error ){
 			return 1;
 		}else {
 			ficheroError = fileno(fichero);
-			dup2(ficheroError,2); // Redirreccion a 2, Salida estandar 
+			dup2(ficheroError,fileno(stderr)); // Redirreccion a 2, Salida estandar 
 			fclose(fichero);
 		}
 	}
