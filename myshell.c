@@ -2,18 +2,19 @@
 #include "parser.h"
 #include <sys/wait.h>
 #include <stdlib.h> 
-#include <unistd.h> // Para el execvp 
+#include <unistd.h>
 #include <errno.h>
 #include <wait.h> 
 #include <string.h> 
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <signal.h>
 
 /*
 * Autores: Iván Pérez Huete - Carlos Olmo Sahuquillo
 *
-* 11/25/17
+* 11/30/17
 */
 
 // gcc -Wall -Wextra myshell.c libparsher_64.a -o myshell 
@@ -33,10 +34,19 @@ int main(void) {
 	pid_t pid;
 	int ** tuberias;
 	
+	/* Señales, se tratan inmediatamente SIGINT == Ctrl+C y SIGQUIT == Ctrl + \ */
+	// Ignoramos las señales
+	signal(SIGINT , SIG_IGN);
+	signal(SIGQUIT, SIG_IGN);
+	
+	
 	
 	printf("msh> ");
 	
 	while (fgets(buf, 1024, stdin)) {
+		
+		signal(SIGINT,SIG_IGN);
+        signal(SIGQUIT,SIG_IGN);
 		
 		// Acceso al atributo de un puntero de forma sencilla -> 
 
@@ -73,6 +83,11 @@ int main(void) {
 
 		// Para 1 solo comando, contampla CD 
 		if(line->ncommands==1){
+			
+			//Señales, accion por defecto
+				signal(SIGINT , SIG_DFL);
+				signal(SIGQUIT, SIG_DFL);
+			
 			// Comprueba si es cd
 			if (strcmp(line->commands[0].argv[0], CDCONTS) == 0){// Comprueba si es el mandato es cd, llama a subprograma
 				mycd();
@@ -82,7 +97,8 @@ int main(void) {
 					fprintf(stderr, "Falló el fork().\n%s\n", strerror(errno));
 					exit(1);
 				}
-				else if (pid == 0) { // Hace hijo 				
+				else if (pid == 0) { // Hace hijo 	
+					
 					execvp(line->commands[0].filename, line->commands[0].argv ); // Si pasa del exec , es que hay error
 					fprintf(stderr, "Error al ejecutar el comando: %s\n", strerror(errno));
 					exit(1);
@@ -106,12 +122,18 @@ int main(void) {
 			}
 			int pids;
 			for(i=0;i<line->ncommands;i++){
+				
+				//Señales, accion por defecto
+					signal(SIGINT , SIG_DFL);
+					signal(SIGQUIT, SIG_DFL);
+				
 				// Hace un fork() para cada hijo. El numero va cambiando con los forks
 				pids=fork();				
 				if(pids<0){ //error
 					fprintf(stderr, "Falló el fork().\n%s\n", strerror(errno));
 					exit(1);
 				} else if (pids==0){ // Sino error hace hijos
+					
 					if(i==0){ //Primer hjijo
 						close(tuberias[i][0]);
 						dup2(tuberias[i][1],1);
