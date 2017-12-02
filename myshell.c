@@ -18,6 +18,7 @@
 */
 
 // gcc -Wall -Wextra myshell.c libparsher_64.a -o myshell 
+// 	fprintf(stderr,	"%s : No se encuentra el mandato\n" , line->commands[0].argv[0] ); 
 
 int funcionRedireccion ( char * entrada , char * salida , char * error );
 void mycd ();
@@ -33,18 +34,20 @@ int main(void) {
 	int i;
 	pid_t pid;
 	int ** tuberias;
+	int rEntrada = dup(fileno(stdin));
+	int rSalida = dup(fileno(stdout));
+	int rError = dup(fileno(stderr));
 	
 	/* Señales, se tratan inmediatamente SIGINT == Ctrl+C y SIGQUIT == Ctrl + \ */
 	// Ignoramos las señales
 	signal(SIGINT , SIG_IGN);
 	signal(SIGQUIT, SIG_IGN);
 	
-	
-	
 	printf("msh> ");
 	
 	while (fgets(buf, 1024, stdin)) {
 		
+		// Si hago background poner esto tambien, ignorar como en la minishell 
 		signal(SIGINT,SIG_IGN);
         signal(SIGQUIT,SIG_IGN);
 		
@@ -59,20 +62,14 @@ int main(void) {
 		}
 
 		if (line->redirect_input != NULL) {
-			//printf("redirección de entrada: %s\n", line->redirect_input);
-			//funcionRedireccion ( line->redirect_input , NULL , NULL ); 
+			funcionRedireccion ( line->redirect_input , NULL , NULL ); 
 			//freopen(line->redirect_input , "r" , stdin );
-			return(1);
 		}
 		if (line->redirect_output != NULL) {
-			//printf("redirección de salida: %s\n", line->redirect_output);
-			freopen(line->redirect_output , "w" , stdout );
-			return(1);
+			funcionRedireccion ( NULL , line->redirect_output , NULL ); 
 		}
 		if (line->redirect_error != NULL) {
-			//printf("redirección de error: %s\n", line->redirect_error);
-			freopen(line->redirect_error , "w" , stderr );
-			return(1);
+			funcionRedireccion ( NULL , NULL , line->redirect_error ); 
 		}
 		if (line->background) {
 			printf("comando a ejecutarse en background\n");
@@ -100,8 +97,10 @@ int main(void) {
 				else if (pid == 0) { // Hace hijo 	
 					
 					execvp(line->commands[0].filename, line->commands[0].argv ); // Si pasa del exec , es que hay error
+					// devuelve - 1 y salta el error 
 					fprintf(stderr, "Error al ejecutar el comando: %s\n", strerror(errno));
 					exit(1);
+					
 				}else{ 	
 					wait (&status);
 					if (WIFEXITED(status) != 0)
@@ -109,7 +108,8 @@ int main(void) {
 							printf("El comando no se ejecutó correctamente\n");
 				}
 			}
-		}else {// Para n Comandos
+			
+		}else if(!(line->ncommands == 1)){ // Si son 2 comandos o más
 				
 			// Variable tuberia de memoria dinamica para los N-1 comandos que haya ( una tuberia cada 2 comandos )
 			// Variable pid para los descriptores de fichero, irá cambiando con los forks 
@@ -141,7 +141,7 @@ int main(void) {
 
 						printf("Error al ejecutar el comando: %s\n", strerror(errno));
 						exit(1);
-					}else if(i==(line->ncommands-1)){// Utimo hijo
+					}else if(i==(line->ncommands-1)){	// Utimo hijo
 						close(tuberias[i-1][1]);
 						dup2(tuberias[i-1][0],0);
 						execvp(line->commands[i].argv[0], line->commands[i].argv);
@@ -175,8 +175,21 @@ int main(void) {
 				free(tuberias[i]);
 			}
 			free(tuberias);
+			
 		}
-
+		
+		// Restablecer las redirecciones
+		
+		if(line->redirect_input != NULL ){
+			dup2(rEntrada , fileno(stdin));	
+		}
+		if(line->redirect_output != NULL ){
+			dup2(rSalida , fileno(stdout));	
+		}
+		if(line->redirect_error != NULL ){
+			dup2(rError , fileno(stderr));	
+		}
+		
 		printf("msh> ");
 	}
 	return 0;
@@ -191,52 +204,46 @@ int main(void) {
 
 int funcionRedireccion ( char * entrada , char * salida , char * error ){
 	
-	FILE * fichero; // Variable para guardar las redirecciones 
-	int ficheroError;
-	int ficheroSalida;
-	int ficheroEntrada;
+	int aux; // variable auxiliar para redirigir 
+	
+	// Mostrar Error si falla OJO 
 
-	// Si es de entrada 
+	// Si es de entrada. Requisitos que ponerle para que te deje abrir y editar el documento
 	if(entrada != NULL ) {
-		fichero = fopen (entrada , "r") ; // Permiso read 
-		if(fichero == NULL){
-			fprintf( stderr , "%s : Error. %s\n" , entrada , strerror(errno)); // Mostrar error 
+		aux = open (entrada , O_CREAT | O_RDONLY);
+		if(aux == -1){
+			fprintf( stderr , "%s : Error. %s\n" , entrada , strerror(errno)); // Mostrar error , -1 igual a NULL 
 			return 1;
-		} else {
-			ficheroEntrada = fileno(fichero); // puntero del stream a descriptor de fichero . 
-			dup2(ficheroEntrada,fileno(stdin)); // Redirreccion a 0, Entrada estandar 
-			fclose(fichero);
+		} else { 
+			dup2(aux,fileno(stdin)); // Redirreccion a 0, Entrada estandar 
 		}	
 	}
 	
 	// Si es de Salida
-	if( salida != NULL ){
-		fichero = fopen(salida , "w"); // Permiso Write
-		if(fichero == NULL){
-			fprintf (stderr , "%s : Error. %s\n" , salida , strerror(errno)); // Mostrar error 
+	if(salida != NULL ) {
+		aux = creat (salida ,  S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH );
+		if(aux == -1){
+			fprintf( stderr , "%s : Error. %s\n" , salida , strerror(errno)); // Mostrar error , -1 igual a NULL 
 			return 1;
-		} else {
-			ficheroSalida = fileno(fichero);
-			dup2(ficheroSalida,fileno(stdout)); // Redirreccion a 1, Salida estandar . Fileno para descriptor de fichero
-			fclose(fichero);					// dup 2 solo usa int 
-		}
+		} else { 
+			dup2(aux,fileno(stdout)); // Redirreccion a 1, Salida estandar 
+		}	
 	}
 	
 	// Si es de error 
-	if (error != NULL ){
-		fichero = fopen (error , "w"); // Permiso write 
-		if(fichero == NULL){
-			fprintf(stderr , "%s : Error. %s\n" , error , strerror(errno)); // Mostrar error 
+	if(error != NULL ) {
+		aux = creat (error ,  S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+		if(aux == -1){
+			fprintf( stderr , "%s : Error. %s\n" , error , strerror(errno)); // Mostrar error , -1 igual a NULL 
 			return 1;
-		}else {
-			ficheroError = fileno(fichero);
-			dup2(ficheroError,fileno(stderr)); // Redirreccion a 2, Salida estandar 
-			fclose(fichero);
-		}
+		} else { 
+			dup2(aux,fileno(stderr)); // Redirreccion a 2, Error estandar 
+		}	
 	}
 	
 	return 0;
 }
+
 
 void mycd (){
 	
