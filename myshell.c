@@ -22,6 +22,7 @@
 
 int funcionRedireccion ( char * entrada , char * salida , char * error );
 void mycd ();
+int ComandoValido (char * comando);
 
 #define CDCONTS "cd" // Constante para hacer cd 
 
@@ -34,6 +35,7 @@ int main(void) {
 	int i;
 	pid_t pid;
 	int ** tuberias;
+	int pids;
 	int rEntrada = dup(fileno(stdin));
 	int rSalida = dup(fileno(stdout));
 	int rError = dup(fileno(stderr));
@@ -94,13 +96,18 @@ int main(void) {
 					fprintf(stderr, "Falló el fork().\n%s\n", strerror(errno));
 					exit(1);
 				}
-				else if (pid == 0) { // Hace hijo 	
+				else if (pid == 0) { // Hace hijo 
 					
-					execvp(line->commands[0].filename, line->commands[0].argv ); // Si pasa del exec , es que hay error
-					// devuelve - 1 y salta el error 
-					fprintf(stderr, "Error al ejecutar el comando: %s\n", strerror(errno));
-					exit(1);
+					if(ComandoValido(line->commands[0].filename)==0){ // Mirar si es un comando Válido
 					
+						execvp(line->commands[0].filename, line->commands[0].argv ); // Si pasa del exec , es que hay error
+						// devuelve - 1 y salta el error 
+						fprintf(stderr, "Error al ejecutar el comando: %s\n", strerror(errno));
+						exit(1);
+						
+					} else {
+						fprintf(stderr, "%s : No se encuentra el mandato\n" , line->commands[0].argv[0]); // El comando no es válido, mostrarlo
+					}					
 				}else{ 	
 					wait (&status);
 					if (WIFEXITED(status) != 0)
@@ -118,9 +125,8 @@ int main(void) {
 			for(i=0;i<line->ncommands-1;i++){
 				tuberias[i]=(int*)malloc(2*sizeof(int));
 				pipe(tuberias[i]);
-				printf("Tuberia ini %d\n" , i);
 			}
-			int pids;
+			
 			for(i=0;i<line->ncommands;i++){
 				
 				//Señales, accion por defecto
@@ -166,10 +172,9 @@ int main(void) {
 					}
 				}
 			}
-			for(i=0;i<line->ncommands;i++){	
-				waitpid(pids,&status,0);
-				//fprintf(stderr,"waits: %s\n", strerror(errno));
-			}
+			// Esperar que termine todo, 0 significa esperar a cualquier proceso hijo
+			waitpid(pids,&status,0); 
+			
 			//Liberamos la memoria reservada antes
 			for(i=0;i<line->ncommands-1;i++){
 				free(tuberias[i]);
@@ -270,6 +275,14 @@ void mycd (){
 		fprintf(stderr,"Error al cambiar de directorio: %s\n", strerror(errno)); // Los errores a llamada al sistema siempre se guardan en errno, y strerror explica el porque de errno.
 	}
 	printf( "El directorio actual es: %s\n", getcwd(buffer,-1));
+}
+
+int ComandoValido (char * comando){ // Ver si los comandos son validos
+	if(comando == NULL ){
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
 
