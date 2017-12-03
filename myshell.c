@@ -14,11 +14,10 @@
 /*
 * Autores: Iván Pérez Huete - Carlos Olmo Sahuquillo
 *
-* 11/30/17
+* 12/3/17
 */
 
-// gcc -Wall -Wextra myshell.c libparsher_64.a -o myshell 
-// 	fprintf(stderr,	"%s : No se encuentra el mandato\n" , line->commands[0].argv[0] ); 
+// gcc -Wall -Wextra myshell.c libparsher_64.a -o myshell  
 
 int funcionRedireccion ( char * entrada , char * salida , char * error );
 void mycd ();
@@ -26,7 +25,7 @@ int ComandoValido (char * comando);
 
 #define CDCONTS "cd" // Constante para hacer cd 
 
-tline * line;
+tline * line; 
 
 
 int main(void) {
@@ -36,6 +35,7 @@ int main(void) {
 	pid_t pid;
 	int ** tuberias;
 	int pids;
+	// Guardar entradas estandar para posible redireccion
 	int rEntrada = dup(fileno(stdin));
 	int rSalida = dup(fileno(stdout));
 	int rError = dup(fileno(stderr));
@@ -65,7 +65,6 @@ int main(void) {
 
 		if (line->redirect_input != NULL) {
 			funcionRedireccion ( line->redirect_input , NULL , NULL ); 
-			//freopen(line->redirect_input , "r" , stdin );
 		}
 		if (line->redirect_output != NULL) {
 			funcionRedireccion ( NULL , line->redirect_output , NULL ); 
@@ -103,7 +102,7 @@ int main(void) {
 						execvp(line->commands[0].filename, line->commands[0].argv ); // Si pasa del exec , es que hay error
 						// devuelve - 1 y salta el error 
 						fprintf(stderr, "Error al ejecutar el comando: %s\n", strerror(errno));
-						exit(1);
+						// exit(1); lo quito para seguir con el prompt
 						
 					} else {
 						fprintf(stderr, "%s : No se encuentra el mandato\n" , line->commands[0].argv[0]); // El comando no es válido, mostrarlo
@@ -121,7 +120,7 @@ int main(void) {
 			// Variable tuberia de memoria dinamica para los N-1 comandos que haya ( una tuberia cada 2 comandos )
 			// Variable pid para los descriptores de fichero, irá cambiando con los forks 
 				
-			tuberias=(int**) malloc ((line->ncommands-1)*sizeof(int*));
+			tuberias=(int**) malloc ((line->ncommands-1)*sizeof(int*)); 
 			for(i=0;i<line->ncommands-1;i++){
 				tuberias[i]=(int*)malloc(2*sizeof(int));
 				pipe(tuberias[i]);
@@ -133,44 +132,52 @@ int main(void) {
 					signal(SIGINT , SIG_DFL);
 					signal(SIGQUIT, SIG_DFL);
 				
-				// Hace un fork() para cada hijo. El numero va cambiando con los forks
-				pids=fork();				
-				if(pids<0){ //error
-					fprintf(stderr, "Falló el fork().\n%s\n", strerror(errno));
-					exit(1);
-				} else if (pids==0){ // Sino error hace hijos
-					
-					if(i==0){ //Primer hjijo
-						close(tuberias[i][0]);
-						dup2(tuberias[i][1],1);
-						execvp(line->commands[i].filename, line->commands[i].argv );
-
-						printf("Error al ejecutar el comando: %s\n", strerror(errno));
-						exit(1);
-					}else if(i==(line->ncommands-1)){	// Utimo hijo
-						close(tuberias[i-1][1]);
-						dup2(tuberias[i-1][0],0);
-						execvp(line->commands[i].argv[0], line->commands[i].argv);
-						
-						printf("Error al ejecutar el comando: %s\n", strerror(errno));
-						exit(1);
-					}else{	// Resto de hijos			
-						close(tuberias[i][0]);	
-						close(tuberias[i-1][1]);	
-						dup2(tuberias[i-1][0],0);	
-						dup2(tuberias[i][1],1);
-
-						execvp(line->commands[i].argv[0], line->commands[i].argv);	
-
-						printf("Error al ejecutar el comando: %s\n", strerror(errno));
-						exit(1);
-					}
+				if(ComandoValido(line->commands[i].filename)==0){ // Si todos los comandos son validos
 				
-				}else{	//Padre
-					if(!(i==(line->ncommands-1))){ // Por esto la violacion del core
-						close(tuberias[i][1]);
+					// Hace un fork() para cada hijo. El numero va cambiando con los forks
+					pids=fork();				
+					if(pids<0){ //Error fork
+						fprintf(stderr, "Falló el fork().\n%s\n", strerror(errno));
+						exit(1);
+					} else if (pids==0){ // Sino error hace hijos
+
+						if(i==0){ //Primer hjijo
+							close(tuberias[i][0]);
+							dup2(tuberias[i][1],1);
+							execvp(line->commands[i].argv[0], line->commands[i].argv);
+
+							fprintf(stderr, "Error al ejecutar el comando: %s\n", strerror(errno));
+							exit(1);
+							
+						}else if(i==(line->ncommands-1)){	// Utimo hijo
+							close(tuberias[i-1][1]);
+							dup2(tuberias[i-1][0],0);
+							execvp(line->commands[i].argv[0], line->commands[i].argv);
+
+							fprintf(stderr, "Error al ejecutar el comando: %s\n", strerror(errno));
+							exit(1);
+							
+						}else{	// Resto de hijos			
+							close(tuberias[i][0]);	
+							close(tuberias[i-1][1]);	
+							dup2(tuberias[i-1][0],0);	
+							dup2(tuberias[i][1],1);
+
+							execvp(line->commands[i].argv[0], line->commands[i].argv);	
+
+							fprintf(stderr, "Error al ejecutar el comando: %s\n", strerror(errno));
+							exit(1);
+							
+						}
+
+					}else{	//Padre
+						if(!(i==(line->ncommands-1))){ // Por esto la violacion del core
+							close(tuberias[i][1]);
+						}
 					}
-				}
+				}else { // Si hay comandos no validos 
+					fprintf(stderr, "%s : No se encuentra el mandato\n" , line->commands[i].argv[0]); // El comando no es válido, mostrarlo
+				}		
 			}
 			// Esperar que termine todo, 0 significa esperar a cualquier proceso hijo
 			waitpid(pids,&status,0); 
@@ -210,8 +217,6 @@ int main(void) {
 int funcionRedireccion ( char * entrada , char * salida , char * error ){
 	
 	int aux; // variable auxiliar para redirigir 
-	
-	// Mostrar Error si falla OJO 
 
 	// Si es de entrada. Requisitos que ponerle para que te deje abrir y editar el documento
 	if(entrada != NULL ) {
@@ -220,7 +225,7 @@ int funcionRedireccion ( char * entrada , char * salida , char * error ){
 			fprintf( stderr , "%s : Error. %s\n" , entrada , strerror(errno)); // Mostrar error , -1 igual a NULL 
 			return 1;
 		} else { 
-			dup2(aux,fileno(stdin)); // Redirreccion a 0, Entrada estandar 
+			dup2(aux,fileno(stdin)); // Redirreccion de 0, Entrada estandar 
 		}	
 	}
 	
@@ -231,7 +236,7 @@ int funcionRedireccion ( char * entrada , char * salida , char * error ){
 			fprintf( stderr , "%s : Error. %s\n" , salida , strerror(errno)); // Mostrar error , -1 igual a NULL 
 			return 1;
 		} else { 
-			dup2(aux,fileno(stdout)); // Redirreccion a 1, Salida estandar 
+			dup2(aux,fileno(stdout)); // Redirreccion de 1, Salida estandar 
 		}	
 	}
 	
@@ -242,7 +247,7 @@ int funcionRedireccion ( char * entrada , char * salida , char * error ){
 			fprintf( stderr , "%s : Error. %s\n" , error , strerror(errno)); // Mostrar error , -1 igual a NULL 
 			return 1;
 		} else { 
-			dup2(aux,fileno(stderr)); // Redirreccion a 2, Error estandar 
+			dup2(aux,fileno(stderr)); // Redirreccion de 2, Error estandar 
 		}	
 	}
 	
@@ -277,6 +282,7 @@ void mycd (){
 	printf( "El directorio actual es: %s\n", getcwd(buffer,-1));
 }
 
+
 int ComandoValido (char * comando){ // Ver si los comandos son validos
 	if(comando == NULL ){
 		return 1;
@@ -284,53 +290,4 @@ int ComandoValido (char * comando){ // Ver si los comandos son validos
 		return 0;
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
