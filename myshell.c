@@ -14,11 +14,12 @@
 /*
 * Autores: Iván Pérez Huete - Carlos Olmo Sahuquillo
 *
-* 12/3/17
+* 12/8/17
 */
 
-// gcc -Wall -Wextra myshell.c libparsher_64.a -o myshell  
+// gcc -Wall -Wextra myshell.c libparsher_64.a -o myshell  ejecutar 
 
+// Cabeceras de las funciones a usar 
 int funcionRedireccion ( char * entrada , char * salida , char * error );
 void mycd ();
 int ComandoValido (char * comando);
@@ -51,7 +52,7 @@ int main(void) {
 		
 		// Si hago background poner esto tambien, ignorar como en la minishell 
 		signal(SIGINT,SIG_IGN);
-        signal(SIGQUIT,SIG_IGN);
+		signal(SIGQUIT,SIG_IGN);
 		
 		// Acceso al atributo de un puntero de forma sencilla -> 
 
@@ -83,13 +84,13 @@ int main(void) {
 		if(line->ncommands==1){
 			
 			//Señales, accion por defecto
-				signal(SIGINT , SIG_DFL);
-				signal(SIGQUIT, SIG_DFL);
+			signal(SIGINT , SIG_DFL);
+			signal(SIGQUIT, SIG_DFL);
 			
 			// Comprueba si es cd
 			if (strcmp(line->commands[0].argv[0], CDCONTS) == 0){// Comprueba si es el mandato es cd, llama a subprograma
 				mycd();
-			}else{ // Ejecuta el comando, como ejercicio de ejecuta 
+			}else{ // Ejecuta el comando, como ejercicio de ejecuta del tema 3 
 				pid = fork();
 				if (pid < 0) {  // Error fork
 					fprintf(stderr, "Falló el fork().\n%s\n", strerror(errno));
@@ -129,8 +130,8 @@ int main(void) {
 			for(i=0;i<line->ncommands;i++){
 				
 				//Señales, accion por defecto
-					signal(SIGINT , SIG_DFL);
-					signal(SIGQUIT, SIG_DFL);
+				signal(SIGINT , SIG_DFL);
+				signal(SIGQUIT, SIG_DFL);
 				
 				if(ComandoValido(line->commands[i].filename)==0){ // Si todos los comandos son validos
 				
@@ -220,7 +221,7 @@ int funcionRedireccion ( char * entrada , char * salida , char * error ){
 
 	// Si es de entrada. Requisitos que ponerle para que te deje abrir y editar el documento
 	if(entrada != NULL ) {
-		aux = open (entrada , O_CREAT | O_RDONLY);
+		aux = open (entrada , O_CREAT | O_RDONLY); 
 		if(aux == -1){
 			fprintf( stderr , "%s : Error. %s\n" , entrada , strerror(errno)); // Mostrar error , -1 igual a NULL 
 			return 1;
@@ -231,7 +232,8 @@ int funcionRedireccion ( char * entrada , char * salida , char * error ){
 	
 	// Si es de Salida
 	if(salida != NULL ) {
-		aux = creat (salida ,  S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH );
+		//aux = open(salida, O_WRONLY | O_CREAT | O_TRUNC);
+		aux = creat (salida ,  S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH ); // Crea o reescribe un archivo 
 		if(aux == -1){
 			fprintf( stderr , "%s : Error. %s\n" , salida , strerror(errno)); // Mostrar error , -1 igual a NULL 
 			return 1;
