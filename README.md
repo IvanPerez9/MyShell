@@ -1,7 +1,38 @@
 # SO-myshell
-* __Práctica 2 de Sistemas Operativos. En esta práctica se abordará el problema de implementar un programa que actúe como intérprete de mandatos. El minishell a implementar debe interpretar y ejecutar mandatos leyéndolos de la entrada estándar.__
+<b>[ESP]</b> Práctica 2 de Sistemas Operativos. En esta práctica se abordará el problema de implementar un programa que actúe como intérprete de mandatos. El minishell a implementar debe interpretar y ejecutar mandatos leyéndolos de la entrada estándar.
 
+<b>[EN]</b> Second project of Operating Systems. The implemented minishell pretends to works as the original.
 
+## Compilación // How to compile this proyect: 
+
+<b>[ESP]</b>
+Usamos Wall y Wextra como opciones de gcc para filtar y habilitar los warnings de todo tipo.
+
+<b>Wall: </b>Habilita todos los avisos de construcciones que el usuario considere cuestionables, y que son faciles de evitar, modificar o prevenir.
+
+<b> Wextra: </b>Habilita algunos avisos extra que no son habilitados con -Wall. (Esta opcion se suele llamar tambien con -W solo, pero -Wextra es más representativa.)
+```shell
+$ make
+gcc -Wall -Wextra myshell.c libparsher_64.a -o myshell 
+```
+
+El resto de ficheros <i>libparsher_64.a</i> son usados para dar la funcionalidad a la shell. <b>No son creados por mí. </b>
+
+-------------------------------
+<b>[EN]</b>
+We use Wall and Wextra as options to request or suppress warnings.
+
+<b>Wall: </b>This enables all the warnings about constructions that some users consider questionable, and that are easy to avoid (or modify to prevent the warning), even in conjunction with macros.
+
+<b> Wextra: </b>This enables some extra warning flags that are not enabled by -Wall. (This option used to be called -W. The older name is still supported, but the newer name is more descriptive.)
+```shell
+$ make
+gcc -Wall -Wextra myshell.c libparsher_64.a -o myshell 
+```
+
+The rest of files <i>libparsher_64.a</i> are used to provide our shell the reading and interpreting functionality of the introduced commands. <b>These files were not created by me. </b>
+
+## Normas // Rules 
 * __En definitiva debe ser capaz de:__
   * Ejecutar una secuencia de uno o varios mandatos separados por el carácter ‘|’.
   * Permitir redirecciones:
@@ -64,3 +95,8 @@
   esos objetivos.
   Nota: no se debe hacer un programa separado para cada objetivo, sino un único programa genérico que cumpla con
   todos los objetivos simultáneamente.
+  
+## Requisitos // Requirements 
+<b>[ESP]</b>Estos comandos están diseñados para ejecutarse en un sistema operativo UNIX (Con compilador GCC). <b> Cualquier distribucion de Mac OSX o Linux </b> 
+
+<b>[EN]</b>These commands are designed to work in a UNIX (GCC Compiler needed). <b>Max OSX or Any Linux distribution</b>
