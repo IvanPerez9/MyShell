@@ -5,7 +5,7 @@
 
 <b>[ESP]</b> Práctica 2 de Sistemas Operativos. En esta práctica se abordará el problema de implementar un programa que actúe como intérprete de mandatos. El minishell a implementar debe interpretar y ejecutar mandatos leyéndolos de la entrada estándar.
 
-<b>[EN]</b> Second project of Operating Systems. The implemented minishell pretends to works as the original.
+<b>[EN]</b> Second project of Operating Systems. The implemented minishell pretends to works as the original.The idea is to provide a basic personal minishell.
 
 ## Compilación // How to compile this proyect: 
 
