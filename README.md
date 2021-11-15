@@ -1,7 +1,6 @@
 # SO-myshell
 
 ![Bash Shell](https://badges.frapsoft.com/bash/v1/bash.png?v=103)
-[![Twitter Follow](https://img.shields.io/twitter/follow/Ivan_Prz12.svg?style=social)](https://twitter.com/Ivan_Prz12)
 
 <b>[ESP]</b> Práctica 2 de Sistemas Operativos. En esta práctica se abordará el problema de implementar un programa que actúe como intérprete de mandatos. El minishell a implementar debe interpretar y ejecutar mandatos leyéndolos de la entrada estándar.
 
