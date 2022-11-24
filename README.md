@@ -6,7 +6,7 @@
 
 <b>[EN]</b> Second project of Operating Systems. The implemented minishell pretends to works as the original.The idea is to provide a basic personal minishell.
 
-## Compilación // How to compile this proyect: 
+## Compilación // How to compile this project: 
 
 <b>[ESP]</b>
 Usamos Wall y Wextra como opciones de gcc para filtar y habilitar los warnings de todo tipo.
@@ -19,7 +19,7 @@ $ make
 gcc -Wall -Wextra myshell.c libparsher_64.a -o myshell 
 ```
 
-El resto de ficheros <i>libparsher_64.a</i> son usados para dar la funcionalidad a la shell. <b>No son creados por mí. </b>
+El resto de ficheros <i>'libparsher_64.a'</i> son usados para dar la funcionalidad a la shell. <b>No son creados por mí. </b> . Por lo tanto no está disponible en este repositorio.
 
 -------------------------------
 <b>[EN]</b>
@@ -33,7 +33,7 @@ $ make
 gcc -Wall -Wextra myshell.c libparsher_64.a -o myshell 
 ```
 
-The rest of files <i>libparsher_64.a</i> are used to provide our shell the reading and interpreting functionality of the introduced commands. <b>These files were not created by me. </b>
+The rest of files <i>'libparsher_64.a'</i> are used to provide our shell the reading and interpreting functionality of the introduced commands. <b>These files were not created by me. </b> therefore not available in this repository.
 
 ## Normas // Rules 
 * __En definitiva debe ser capaz de:__
